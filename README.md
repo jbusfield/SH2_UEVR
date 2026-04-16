@@ -36,7 +36,7 @@ With this option unchecked, raytracing is disabled, providing a significant perf
 #### Interaction
 You can use Vanilla interaction and use the native game controls, or use Mixed interaction which allows for enhanced VR mechanics. When using mixed mode, aiming the gun is done with weapon hand grip and firing the weapon is done with weapon hand trigger.
 #### Physical Gunstocks
-If you are a using physical gunstock you can you to the Gunstock Config tab and uncheck "Disable". The mod is preconfigured to work with SmartStocks and should work fine with other stocks but if you need to make adjustments for your gunstock do the following:
+If you are a using physical gunstock you can go to the Gunstock Config tab and uncheck "Disable". The mod is preconfigured to work with SmartStocks and should work fine with other stocks but if you need to make adjustments for your gunstock do the following:
 - Equip the weapon. The entry for that weapon will turn blue.
 - Click the open arrow in the config to see the Rotation entries
 - Adjust the rotation entries that work best for your gunstock
