@@ -1023,6 +1023,15 @@ setInterval(200, function()
 			if status.isTraversing == false then status.currentGameplayInputMode = 0 end
 		end
 	end
+
+	--When map is showing use default button mappings
+	local map = uevrUtils.getValid(pawn, {"Items", "ItemExecutive"})
+	if map ~= nil and string.sub(map:get_full_name(), 1, 3) == "Map"  then
+		ui.setCustomState("remapEnabled", false, 2)
+	else
+		ui.setCustomState("remapEnabled", nil)
+	end
+
 end)
 
 
