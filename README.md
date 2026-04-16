@@ -21,9 +21,9 @@ The mod has many configurable options. Open the UEVR overlay and click the Silen
 #### Forward Movement Direction
 Selecting Follows Head allows for full roomscale movement. Selecting Game will use only stick movements to control player movements but roomscale play will then not be supported.
 #### Hands Type
-None - no visible hands
-Forearms - only forearms and hands are visible (no IK)
-IK Arms - 2 Bone IK arms are used
+- None - no visible hands
+- Forearms - only forearms and hands are visible (no IK)
+- IK Arms - 2 Bone IK arms are used
 #### Light Location
 You have the option to attach the flashlight to your head, off hand or weapon hand. When the flashlight is in your offhand the flashlight mesh will be shown in your hand.
 When Interaction Controls are set to "Mixed" you also have the option of using gestures to place the flashlight location. An offhand grab on top of your head above the HMD will move the flashlight from your head to your offhand and vice versa. Same with the weapon hand although the weapon hand wont hold the flashlight mesh, it will only control the light direction
