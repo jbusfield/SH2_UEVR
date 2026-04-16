@@ -2,7 +2,7 @@
 A VR first person mod for UEVR when playing Silent Hill 2
 
 ### Credits
-Thanks to Praydog, for both UEVR that makes these mods possible and his original melee combat code which is used by this mod nearly unchanged
+Thanks to Praydog, for both UEVR that makes these mods possible and for his original melee combat code which is used by this mod nearly unchanged
 
 ### Features
 - Full 1st person 6DOF Motion controls
@@ -32,9 +32,15 @@ It is recommended to keep Hide Head checked with the only downside that player s
 #### Offhand Can Grip Weapon
 With this option checked, when using the shotgun and rifle and moving your offhand near the weapon offhand grip location, the offhand will animate grabbing the weapon. This feature is best with physical gunstocks but can be interesting even without.
 #### Enable Raytracing
-With this option unchecked, raytracing is disabled, providing a significant performance boost. However, there can be annoying visual glitch when running without raytracing. The Fix Visual Glitches option fixes these issue and runs every 10 seconds by default.
+With this option unchecked, raytracing is disabled, providing a significant performance boost. However, there can be annoying visual glitches when running without raytracing. The Fix Visual Glitches option fixes these issue and runs every 10 seconds by default.
 #### Interaction
 You can use Vanilla interaction and use the native game controls, or use Mixed interaction which allows for enhanced VR mechanics
+#### Physical Gunstocks
+If you are a using physical gunstock you can you to the Gunstock Config tab and uncheck "Disable". The mod is preconfigured to work with SmartStocks and should work fine with other stocks but if you need to make adjustments for your gunstock do the following:
+- Equip the weapon. The entry for that weapon will turn blue.
+- Click the open arrow in the config to see the Rotation entries
+- Adjust the rotation entries that work best for your gunstock
+
 
 ### Coming Soon
 Left handed support
