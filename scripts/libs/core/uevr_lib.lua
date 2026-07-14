@@ -11,7 +11,7 @@ end
 function M.find_required_object(name)
     local obj = uevr.api:find_uobject(name)
     if not obj then
-        M.print("Cannot find " .. name)
+        print("Cannot find " .. name)
         return nil
     end
 
@@ -54,7 +54,14 @@ end
 function M.find_all_instances(className, includeDefault)
 	local class =  M.get_class(className)
 	if class ~= nil and class.get_objects_matching ~= nil then
-		return class:get_objects_matching(includeDefault)
+		local ok, result = pcall(function()
+			return class:get_objects_matching(includeDefault)
+		end)
+		if ok then
+			return result
+		else
+			print("[uevr_lib] Error finding all instances in find_all_instances handled properly", className, result)
+		end
 	end
 	return nil
 end

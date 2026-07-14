@@ -404,11 +404,13 @@ local function lerpAnimation(animID, animName, alpha)
 				end
 				if startPose ~= nil and endPose ~= nil then
 					for boneName, angles in pairs(startPose) do
-						local startRotator = uevrUtils.rotator(angles[1], angles[2], angles[3])
-						local endRotator = uevrUtils.rotator(endPose[boneName][1], endPose[boneName][2], endPose[boneName][3])
-						--M.print("Lerping " .. boneName .. " " .. alpha, LogLevel.Info)
-						local localRotator = kismet_math_library:RLerp(startRotator, endRotator, alpha, true)
-						M.setBoneSpaceLocalRotator(component, uevrUtils.fname_from_string(boneName), localRotator, boneSpace)
+						if endPose[boneName] ~= nil then
+							local startRotator = uevrUtils.rotator(angles[1], angles[2], angles[3])
+							local endRotator = uevrUtils.rotator(endPose[boneName][1], endPose[boneName][2], endPose[boneName][3])
+							--M.print("Lerping " .. boneName .. " " .. alpha, LogLevel.Info)
+							local localRotator = kismet_math_library:RLerp(startRotator, endRotator, alpha, true)
+							M.setBoneSpaceLocalRotator(component, uevrUtils.fname_from_string(boneName), localRotator, boneSpace)
+						end
 					end
 				end
 			end
@@ -449,12 +451,18 @@ function M.initializeBones(skeletalMeshComponent, initialTransform)
 			--print("Scale",scale.X,scale.Y,scale.Z)
 			if transforms["rotation"] ~= nil then
 				rotation = uevrUtils.rotator(transforms["rotation"][1], transforms["rotation"][2], transforms["rotation"][3])
+			else
+				rotation = uevrUtils.rotator(rotation)
 			end
 			if transforms["location"] ~= nil then
 				location = uevrUtils.vector(transforms["location"][1], transforms["location"][2], transforms["location"][3])
+			else
+				location = uevrUtils.vector(location)
 			end
 			if transforms["scale"] ~= nil then
 				scale = uevrUtils.vector(transforms["scale"][1], transforms["scale"][2], transforms["scale"][3])
+			else
+				scale = uevrUtils.vector(scale)
 			end
 			-- print(rotation.Pitch,rotation.Yaw,rotation.Roll)
 			-- print(location.X,location.Y,location.Z)

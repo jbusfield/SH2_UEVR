@@ -61,6 +61,9 @@ local solverDefaults = {
 	smoothing = 0,
     wrist_twist_influence = 0.35,
     wrist_twist_max = 75.0,
+	end_bone_lock_pitch = false,
+	end_bone_lock_yaw = false,
+	end_bone_lock_roll = false,
 }
 
 local meshList = {}
@@ -343,6 +346,26 @@ local function getConfigWidgets(m_paramManager)
 							speed = 1,
 							range = {-360, 360},
 							initialValue = {0,0,0}
+						},
+						{
+							widgetType = "checkbox",
+							id = widgetPrefix .. "end_bone_lock_pitch",
+							label = "Lock Pitch",
+							initialValue = false
+						},
+						{ widgetType = "same_line" },
+						{
+							widgetType = "checkbox",
+							id = widgetPrefix .. "end_bone_lock_yaw",
+							label = "Lock Yaw",
+							initialValue = false
+						},
+						{ widgetType = "same_line" },
+						{
+							widgetType = "checkbox",
+							id = widgetPrefix .. "end_bone_lock_roll",
+							label = "Lock Roll",
+							initialValue = false
 						},
 						{
 							widgetType = "combo",

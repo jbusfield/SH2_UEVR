@@ -64,6 +64,11 @@ Usage
                 print("Widget changed:", active)
             end)
 
+    ui.setCustomState(stateKey, value, priority) -- allow you to force a specific state value, overriding normal behavior
+	    Use nil to reset the state to its default behavior.
+        example:
+            ui.setCustomState("handsEnabled", false, 2)
+            ui.setCustomState("handsEnabled", nil)
 
 ]]--
 
@@ -72,12 +77,17 @@ local paramModule = require("libs/core/params")
 
 local M = {}
 
+M.ShapeEnum = {
+	Flat = 1,
+	Cylinder = 2
+}
 local uiConfigDev = nil
 local uiConfig = nil
 
 local headLockedUI = false
 local headLockedUISize = 2.0
 local headLockedUIPosition = {X=0, Y=0, Z=2.0}
+local headLockedUIShape = M.ShapeEnum.Flat
 
 local isFollowing = true
 local reduceMotionSickness = false
@@ -101,7 +111,8 @@ local stateConfigWidget = {
     {stateKey = "inputEnabled", valueKey = "inputWhenActive"},
     {stateKey = "handsEnabled", valueKey = "handsWhenActive"},
     {stateKey = "remapEnabled", valueKey = "remapWhenActive"},
-    {stateKey = "fadeCamera", valueKey = "fadeCameraWhenActive"}
+    {stateKey = "fadeCamera", valueKey = "fadeCameraWhenActive"},
+    {stateKey = "pawnArmBones", valueKey = "pawnArmBonesWhenActive"}
 }
 
 local stateConfigGame = {
@@ -112,7 +123,8 @@ local stateConfigGame = {
     {stateKey = "inputEnabled", valueKey = "inputWhenInGameState"},
     {stateKey = "handsEnabled", valueKey = "handsWhenInGameState"},
     {stateKey = "remapEnabled", valueKey = "remapWhenInGameState"},
-    {stateKey = "fadeCamera", valueKey = "fadeCameraWhenInGameState"}
+    {stateKey = "fadeCamera", valueKey = "fadeCameraWhenInGameState"},
+    {stateKey = "pawnArmBones", valueKey = "pawnArmBonesWhenInGameState"}
 }
 
 local gameStates = {"cutscene", "paused", "character_hidden"}
@@ -167,9 +179,11 @@ local function updateUI(force)
         if isLocked then
             uevrUtils.setUIFollowsViewOffset(headLockedUIPosition)
             uevrUtils.setUIFollowsViewSize(headLockedUISize)
+            uevrUtils.setUIShape(headLockedUIShape - 1)
         else
             uevrUtils.setUIFollowsViewOffset({X=0, Y=0, Z=2.0})
             uevrUtils.setUIFollowsViewSize(2.0)
+            uevrUtils.setUIShape(0)
         end
         uiState["viewLocked_last"] = uiState["viewLocked"]
         --M.print("Setting 2D mode to " .. tostring(viewportWidgetState["screen2D"]))
@@ -233,11 +247,20 @@ end
 -- input.registerIsDisabledCallback(function()
 -- 	return uiState["inputEnabled"] ~= nil and (not uiState["inputEnabled"]) or nil, uiState["inputEnabledPriority"]
 -- end)
+
+-- TODO this probable needs to use ternary operator like isArmBonesHiddenWithPriority
 function M.isRemapDisabledWithPriority()
     return uiState["remapEnabled"] ~= nil and (not uiState["remapEnabled"]) or nil, uiState["remapEnabledPriority"]
 end
 function M.isRemapDisabled()
     return uiState["remapEnabled"] ~= nil and (not uiState["remapEnabled"]) or false
+end
+
+function M.isArmBonesHiddenWithPriority()
+    return uevrUtils.ternary(uiState["pawnArmBones"] ~= nil, (not uiState["pawnArmBones"]), nil), uiState["pawnArmBonesPriority"]
+end
+function M.isArmBonesHidden()
+    return uiState["pawnArmBones"] ~= nil and (not uiState["pawnArmBones"]) or false
 end
 
 
@@ -264,6 +287,10 @@ end)
 uevrUtils.registerUEVRCallback("is_remap_disabled", function()
     return M.isRemapDisabledWithPriority()
 	--return uiState["remapEnabled"] ~= nil and (not uiState["remapEnabled"]) or nil, uiState["remapEnabledPriority"]
+end)
+
+uevrUtils.registerUEVRCallback("is_arms_bones_hidden", function()
+    return M.isArmBonesHiddenWithPriority()
 end)
 
 uevrUtils.registerUEVRCallback("is_fade_camera_enabled", function()
@@ -325,13 +352,17 @@ local function setCurrentGameStateText(str)
 end
 
 local function updateUIState()
+    local currentUIState = {}
+    for _, config in ipairs(stateConfigWidget) do
+        currentUIState[config.stateKey] = uiState[config.stateKey]
+        currentUIState[config.stateKey .. "Priority"] = uiState[config.stateKey .. "Priority"]
+        uiState[config.stateKey] = nil
+        uiState[config.stateKey .. "Priority"] = 0
+    end
+
     local currentViewportWidgetsStr = ""
     local widgetList = getParameter("widgetlist")
     if widgetList ~= nil then
-        for _, config in ipairs(stateConfigWidget) do
-            uiState[config.stateKey] = nil
-            uiState[config.stateKey .. "Priority"] = 0
-        end
 
         local foundWidgets = {}
         local widgetClass = uevrUtils.get_class("Class /Script/UMG.UserWidget")
@@ -402,27 +433,37 @@ local function updateUIState()
         end
     end
 
+    -- let any listeners know about state changes
+    -- use like this
+    -- uevrUtils.registerUEVRCallback("ui_state_change_remapEnabled", function(state, priority)
+    --     print("Remap enabled changed to " .. tostring(state) .. " with priority " .. tostring(priority))
+    -- end)
+    for _, config in ipairs(stateConfigWidget) do
+        if currentUIState[config.stateKey] ~= uiState[config.stateKey] then
+            --print("UI State " .. config.stateKey .. " changed to " .. tostring(uiState[config.stateKey]) .. " with priority " .. tostring(uiState[config.stateKey .. "Priority"]))
+            uevrUtils.executeUEVRCallbacksWithPriorityResult("ui_state_change_" .. config.stateKey, uiState[config.stateKey], uiState[config.stateKey .. "Priority"])
+        end
+    end
+
     setCurrentGameStateText(currentGameStateText)
 end
+updateUIState = uevrUtils.profiler:wrap("UI: updateUIState", updateUIState)
 
 local enableCutsceneDetection = doOnce(function()
     uevrUtils.registerCutsceneChangeCallback(function(inCutscene)
-        updateUIState()
-        updateUI()
+        M.forceUpdate()
     end)
 end, Once.EVER)
 
 local enablePauseDetection = doOnce(function()
     uevrUtils.registerGamePausedCallback(function(isPaused)
-        updateUIState()
-        updateUI()
+        M.forceUpdate()
     end)
 end, Once.EVER)
 
 local enableCharacterHiddenDetection = doOnce(function()
     uevrUtils.registerCharacterHiddenCallback(function(isHidden)
-        updateUIState()
-        updateUI()
+        M.forceUpdate()
     end)
 end, Once.EVER)
 
@@ -490,6 +531,8 @@ local createConfigMonitor = doOnce(function()
 				M.setHeadLockedUIPosition(paramValue)
 			elseif paramName == "headLockedUISize" then
 				M.setHeadLockedUISize(paramValue)
+			elseif paramName == "headLockedUIShape" then
+				M.setHeadLockedUIShape(paramValue)
 			elseif paramName == "reduceMotionSickness" then
                 if reduceMotionSickness then
                     uevrUtils.enableCameraLerp(paramValue, true, true, true)
@@ -529,6 +572,12 @@ function M.getConfigurationWidgets(options)
     return uiConfig.getConfigurationWidgets(options)
 end
 
+function M.setHeadLockedUIOptions(newOptions)
+    if uiConfig ~= nil then
+	    uiConfig.setHeadLockedUIOptions(newOptions)
+    end
+end
+
 function M.showConfiguration(saveFileName, options)
 	if uiConfig == nil then
 		uiConfig = require("libs/config/ui_config")
@@ -565,6 +614,12 @@ function M.setHeadLockedUISize(value)
     headLockedUISize = value
     updateUI(true)
 end
+function M.setHeadLockedUIShape(value)
+    M.print("Setting UI Shape to " .. tostring(value))
+    if uiConfig ~= nil then uiConfig.setValue("headLockedUIShape", value, true) end
+    headLockedUIShape = value
+    updateUI(true)
+end
 
 function M.setIsInMotionSicknessCausingScene(value)
     isInMotionSicknessCausingScene = value
@@ -595,10 +650,14 @@ function M.registerWidgetChangeCallback(widgetName, func)
     end
 end
 
-local isInMotionSicknessCausingSceneLast = false
-uevrUtils.setInterval(500, function()
+function M.forceUpdate()
     updateUIState()
     updateUI()
+end
+
+local isInMotionSicknessCausingSceneLast = false
+uevrUtils.setInterval(500, function()
+    M.forceUpdate()
 
     local m_isInMotionSicknessCausingScene, priority = executeIsInMotionSicknessCausingSceneCallback()
 	if m_isInMotionSicknessCausingScene ~= isInMotionSicknessCausingSceneLast then

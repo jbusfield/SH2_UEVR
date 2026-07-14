@@ -84,5 +84,8 @@
         "getCustomIKComponentInstance",
         "disableHookFunctions",
         "write_qword"
+    ],
+    "Lua.diagnostics.disable": [
+        "unused-function"
     ]
 }

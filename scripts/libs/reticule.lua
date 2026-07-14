@@ -979,7 +979,7 @@ function M.setActiveReticuleByLabel(label, force)
 		return
 	end
 	local newID = nil
-	if parameters ~= nil then
+	if parameters ~= nil and parameters["reticuleList"] ~= nil then
 		for i=1, #parameters["reticuleList"] do
 			if parameters["reticuleList"][i].label == label then
 				newID = parameters["reticuleList"][i].id

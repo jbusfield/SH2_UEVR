@@ -16,6 +16,7 @@ local ik = require('libs/ik')
 local accessories = require('libs/accessories')
 local mathLib = require('libs/core/math_lib')
 local melee = require('melee')
+local collision = require('libs/collision')
 
 --uevrUtils.setLogLevel(LogLevel.Debug)
 --uevrUtils.setDeveloperMode(true)
@@ -35,6 +36,7 @@ remap.init()
 input.init()
 gunstock.showConfiguration()
 ik.init()
+collision.init()
 
 attachments.setGunstockOffsetsEnabled(false)
 hands.setGunstockOffsetsEnabled(true)
@@ -66,7 +68,7 @@ local TraversalType = {
 }
 
 
-local versionTxt = "v1.0.0"
+local versionTxt = "v1.0.1"
 local title = "Silent Hill 2 First Person Mod " .. versionTxt
 local configDefinition = {
 	{
@@ -201,11 +203,15 @@ local configDefinition = {
 					},
 					{
 						widgetType = "text",
-						label = "    Toggle Flashlight - left trigger"
+						label = "    Toggle Flashlight - offhand trigger"
 					},
 					{
 						widgetType = "text",
-						label = "    Put Flashlight on Head/Retrieve Flashlight - left grip head just above HMD"
+						label = "    Put Flashlight on Head/Retrieve Flashlight - grip head just above HMD using left or right hand"
+					},
+					{
+						widgetType = "text",
+						label = "    Aim weapon - weapon hand grip"
 					},
 				{ widgetType = "end_group"},
 			{ widgetType = "end_rect", additionalSize = 12, rounding = 5 }, { widgetType = "unindent", width = 20 },
@@ -362,7 +368,8 @@ local function regenerateHands(value)
 end
 
 ik.registerOnMeshCreatedCallback(function(meshComponentList, ikInstance)
-     for i, meshComponent in ipairs(meshComponentList or {}) do
+	local collisionParent = uevrUtils.getValid(pawn)
+	for i, meshComponent in ipairs(meshComponentList or {}) do
 		--These hide the arms but not the shadows and flashlight is still blocked even with arms hidden
 		-- meshComponent:SetRenderInMainPass(false)
 		-- meshComponent:SetRenderInDepthPass(false)
@@ -370,15 +377,37 @@ ik.registerOnMeshCreatedCallback(function(meshComponentList, ikInstance)
 
 		--uncomment this to have the arms not cast shadows (and not block the flashlight)
 		--meshComponent.bCastDynamicShadow = false
-     end
+		if collisionParent == nil and meshComponent.GetOwner ~= nil then
+			collisionParent = uevrUtils.getValid(meshComponent:GetOwner())
+		end
+	end
+
+	-- local rightCollider = collision.create("right_hand", collisionParent, Handed.Right)
+	-- local leftCollider = collision.create("left_hand", collisionParent, Handed.Left)
+
+	-- --Use the colliders as accessories so the ik hands will follow the colliders rather than the vr controller
+	-- --This, for example, makes hands not pass through door when opening doors with hands
+	-- if rightCollider ~= nil then uevrUtils.executeUEVRCallbacks("on_accessory_attach", Handed.Right, rightCollider, nil, 0, nil, nil) end
+	-- if leftCollider ~= nil then uevrUtils.executeUEVRCallbacks("on_accessory_attach", Handed.Left, leftCollider, nil, 0, nil, nil) end
 end)
+
 ik.registerOnDestroyCallback(function(ikInstance)
+	uevrUtils.executeUEVRCallbacks("on_accessory_detach", Handed.Right)
+	uevrUtils.executeUEVRCallbacks("on_accessory_detach", Handed.Left)
+
+	-- collision.destroy("right_hand")
+	-- collision.destroy("left_hand")
 	--detach attachments first so they dont get "lost" when hands are destroyed
 	attachments.detachGripAttachments(Handed.Right)
 	attachments.detachGripAttachments(Handed.Left)
 end)
 
 hands.registerOnDestroyCallback(function()
+	uevrUtils.executeUEVRCallbacks("on_accessory_detach", Handed.Right)
+	uevrUtils.executeUEVRCallbacks("on_accessory_detach", Handed.Left)
+
+	-- collision.destroy("right_hand")
+	-- collision.destroy("left_hand")
 	--detach attachments first so they dont get "lost" when hands are destroyed
 	attachments.detachGripAttachments(Handed.Right)
 	attachments.detachGripAttachments(Handed.Left)
@@ -409,7 +438,7 @@ function on_cutscene_change(isInCutscene)
 	melee.disable(isInCutscene)
 end
 
-local function getHandedNess()
+local function getHandedness()
 	local handednessType = configui.getValue("handedness_type")
 	if handednessType == 1 then
 		return Handed.Left
@@ -420,7 +449,7 @@ local function getHandedNess()
 end
 
 local function resetAttachment()
-	local attachmentData = attachments.getCurrentGrippedAttachmentData(getHandedNess())
+	local attachmentData = attachments.getCurrentGrippedAttachmentData(getHandedness())
 	if attachmentData ~= nil and attachmentData.attachment ~= nil and attachmentData.attachment.RelativeLocation ~= nil and attachmentData.attachment.RelativeLocation.X == 0 and attachmentData.attachment.RelativeLocation.Y == 0 and attachmentData.attachment.RelativeLocation.Z == 0 then
 		local loc, rot, scale = attachments.getAttachmentOffset(attachmentData.attachment)
 		local attachmentID = attachments.getAttachmentIDFromAttachment(attachmentData.attachment)
@@ -439,7 +468,7 @@ local function attachLightToController(light)
 		elseif configui.getValue("light_type") == 2 then
 			UEVR_UObjectHook.remove_motion_controller_state(light)
 			local lightState = UEVR_UObjectHook.get_or_add_motion_controller_state(light)
-			lightState:set_hand(1-getHandedNess()) -- off hand
+			lightState:set_hand(1-getHandedness()) -- off hand
 			lightState:set_permanent(false)
 			lightState:set_rotation_offset(temp_vec3f:set(0.38, -0.59, 0.0))
 			lightState:set_location_offset(temp_vec3f:set(-2.4, -6.8, -0.8))
@@ -447,7 +476,7 @@ local function attachLightToController(light)
 		elseif configui.getValue("light_type") == 3 then
 			UEVR_UObjectHook.remove_motion_controller_state(light)
 			local lightState = UEVR_UObjectHook.get_or_add_motion_controller_state(light)
-			lightState:set_hand(getHandedNess()) -- off hand
+			lightState:set_hand(getHandedness()) -- off hand
 			lightState:set_permanent(false)
 			lightState:set_rotation_offset(temp_vec3f:set(0.13, 0.265, 0.0))
 			lightState:set_location_offset(temp_vec3f:set(-2.4, -8.9, -0.8))
@@ -768,7 +797,7 @@ uevrUtils.registerOnPreInputGetStateCallback(function(retval, user_index, state)
 		handleSmoothTurnInput(state)
 
 		if configui.getValue("interaction_control_mode") == 2 then
-			local handed = getHandedNess()
+			local handed = getHandedness()
 			local isEating, isGrabbingGlasses, gripHead, isGrabbingEar, triggerMouth, isScratchingEyes, triggerHead, isScratchingEar = gestures.getHeadGestures(state, 1-handed, false)
 			local isEatingRight, isGrabbingGlassesRight, gripHeadRight, isGrabbingEarRight, triggerMouthRight, isScratchingEyesRight, triggerHeadRight, isScratchingEarRight = gestures.getHeadGestures(state, handed, false)
 
@@ -968,7 +997,7 @@ uevr.sdk.callbacks.on_post_engine_tick(function(engine, delta)
 
 	--This is what aims the ranged weapons
 	if uevrUtils.getValid(status.currentEquippedWeapon) ~= nil and status.currentEquippedWeapon.RootComponent ~= nil and status.currentEquippedWeapon.RootComponent.K2_SetWorldLocation ~= nil then
-		local location, rotation = attachments.getActiveAttachmentTransforms(getHandedNess())
+		local location, rotation = attachments.getActiveAttachmentTransforms(getHandedness())
 		status.currentEquippedWeapon.RootComponent:K2_SetWorldLocation(location, false, reusable_hit_result, false)
 		status.currentEquippedWeapon.RootComponent:K2_SetWorldRotation(rotation, false, reusable_hit_result, false)
 	end
@@ -1003,6 +1032,51 @@ uevr.sdk.callbacks.on_post_engine_tick(function(engine, delta)
 		)
 	end
 
+end)
+
+-- SH2 doors are angle-driven via USHDoorMovementComponent:AddPhysicForce, not Chaos impulses.
+local DOOR_PHYSIC_FORCE_SCALE = 0.1
+
+local function getDoorMovement(actor)
+	if actor == nil then return nil end
+	local candidates = { actor.DoorMovement, actor.LeftDoorMovement, actor.RightDoorMovement }
+	for i = 1, #candidates do
+		local dm = candidates[i]
+		if dm ~= nil and dm.AddPhysicForce ~= nil then
+			return dm
+		end
+	end
+	return nil
+end
+
+collision.registerContactCallback(function(id, handVelocity, hitResult, collider, handed)
+	if handVelocity == nil or hitResult == nil then return end
+	local hit = uevrUtils.getCleanHitResult(hitResult)
+	local hitComp = hit and uevrUtils.getValid(hit.Component) or nil
+	if hit == nil or hitComp == nil or hit.ImpactPoint == nil then return end
+
+	local doorMovement = getDoorMovement(hitComp.GetOwner and hitComp:GetOwner() or nil)
+	if doorMovement == nil then return end
+
+	local pivot = hitComp:K2_GetComponentLocation()
+	local rx = hit.ImpactPoint.X - pivot.X
+	local ry = hit.ImpactPoint.Y - pivot.Y
+	local rz = hit.ImpactPoint.Z - pivot.Z
+	local up = hitComp.GetUpVector and hitComp:GetUpVector() or nil
+	if up == nil then return end
+
+	-- Tangential direction around the hinge (up × radius) so force sign matches swing direction.
+	local tx = up.Y * rz - up.Z * ry
+	local ty = up.Z * rx - up.X * rz
+	local tz = up.X * ry - up.Y * rx
+	local tLen = math.sqrt(tx * tx + ty * ty + tz * tz)
+	if tLen < 1.0 then return end
+	tx, ty, tz = tx / tLen, ty / tLen, tz / tLen
+
+	local moveForce = (handVelocity.X * tx + handVelocity.Y * ty + handVelocity.Z * tz) * DOOR_PHYSIC_FORCE_SCALE
+	if math.abs(moveForce) > 0.001 then
+		doorMovement:AddPhysicForce(moveForce)
+	end
 end)
 
 setInterval(200, function()
@@ -1149,7 +1223,7 @@ function on_level_change(level)
 	applySaveSlotLimit()
     regenerateHands(configui.getValue("hands_type") or 1)
     hideHead(true)
-	delay(3000, fixRaytrace)
+	delay(10000, fixRaytrace)
 	if configui.getValue("fix_orbit_camera_offset") == true then
 		centerOrbitCamera(pawn)
 	end

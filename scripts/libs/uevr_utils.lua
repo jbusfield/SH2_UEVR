@@ -785,15 +785,25 @@ local uevrLib = require('libs/core/uevr_lib')
 local mathLib = require('libs/core/math_lib')
 require("libs/enums/unreal")
 local coreLerp = require("libs/core/lerp")
--- TArray Support ----------------
-local tArrayExists, tArray = pcall(require, "libs/core/tarray")
-if tArrayExists == false then tArray = nil end
-local function checkTArrayExists()
-	if tArray == nil then
-		print("TArray module not loaded. Ensure libs/core/tarray.lua exists and the tarray_helper.dll file is in the plugins folder")
+local pluginExists, plugin = pcall(require, "libs/core/plugin")
+if pluginExists == false then plugin = nil end
+local function checkPluginExists()
+	if plugin == nil then
+		print("Plugin module not loaded. Ensure libs/core/plugin.lua exists and the uevr_utils.dll file is in the plugins folder")
 	end
-	return tArray ~= nil
+	return plugin ~= nil
 end
+-- No need for tArray, Plugin can handle everything tArray did
+-- TArray Support ----------------
+-- local tArrayExists, tArray = pcall(require, "libs/core/tarray")
+-- if tArrayExists == false then tArray = nil end
+-- local function checkTArrayExists()
+-- 	if tArray == nil then
+-- 		print("TArray module not loaded. Ensure libs/core/tarray.lua exists and the tarray_helper.dll file is in the plugins folder")
+-- 	end
+-- 	return tArray ~= nil
+-- end
+-- TArray Support ----------------
 ---------------------------------
 
 -------------------------------
@@ -832,6 +842,7 @@ pawn = nil -- updated every tick
 ---@class Statics
 ---@field [any] any
 Statics = nil
+GameUserSettings = nil
 WidgetBlueprintLibrary = nil
 WidgetLayoutLibrary = nil
 ---@class kismet_system_library
@@ -977,6 +988,14 @@ local isCharacterHidden = false
 local isDeveloperMode = nil
 local handedness = Handed.Right --a way to track handedness in a unified way
 
+-- No need for tArray, Plugin can handle everything tArray did
+-- function M.checkTArrayExists()
+--     return checkTArrayExists()
+-- end
+
+function M.checkPluginExists()
+    return checkPluginExists()
+end
 
 function register_key_bind(keyName, callbackFunc)
 	keyBindList[keyName] = {}
@@ -1633,6 +1652,7 @@ function M.initUEVR(UEVR, callbackFunc)
 	kismet_string_library = M.find_default_instance("Class /Script/Engine.KismetStringLibrary")
 	kismet_rendering_library = M.find_default_instance("Class /Script/Engine.KismetRenderingLibrary")
 	Statics = M.find_default_instance("Class /Script/Engine.GameplayStatics")
+	GameUserSettings = M.find_default_instance("Class /Script/Engine.GameUserSettings")
 	WidgetBlueprintLibrary = M.find_default_instance("Class /Script/UMG.WidgetBlueprintLibrary")
     WidgetLayoutLibrary = M.find_default_instance("Class /Script/UMG.WidgetLayoutLibrary")
     
@@ -2377,6 +2397,38 @@ function M.getWorld()
 end
 
 
+function M.spawn_actor_of_class(className, transform, collisionMethod, owner)
+	local actorClass = M.get_class(className)
+	if actorClass == nil then
+		print("spawn_actor_of_class - class not found:", className)
+		return nil
+	end
+
+	local viewport = game_engine.GameViewport
+	if viewport == nil then
+		print("Viewport is nil")
+	end
+
+	local worldContext = viewport.World
+	if worldContext == nil then
+		print("World is nil")
+	end
+
+	if transform == nil then
+		transform = M.get_transform()
+	end
+
+	collisionMethod = collisionMethod or 1
+	local actor = Statics:BeginDeferredActorSpawnFromClass(worldContext, actorClass, transform, collisionMethod, owner)
+	if actor == nil then
+		print("spawn_actor_of_class - failed to spawn:", className)
+		return nil
+	end
+
+	Statics:FinishSpawningActor(actor, transform)
+	return actor
+end
+
 function M.spawn_actor(transform, collisionMethod, owner, tag)
 	local viewport = game_engine.GameViewport
 	if viewport == nil then
@@ -2442,8 +2494,23 @@ end
 
 
 function M.getSocketNames(object, callback)
----@diagnostic disable-next-line: need-check-nil
-	if checkTArrayExists() then tArray.registerCallback(callback, "FName", object, "GetAllSocketNames()") end
+	--if checkTArrayExists() then tArray.registerCallback(callback, "FName", object, "GetAllSocketNames()") end
+
+	local arr = {}
+	if checkPluginExists() then
+		plugin.showDebug = true
+		---@diagnostic disable-next-line: need-check-nil
+		local result = plugin.executeFunction(object, "GetAllSocketNames")
+		if result ~= nil then
+			local names = result.ReturnValue or {}
+			for i = 1, #names do
+				local name = names[i]
+				table.insert(arr, name)
+			end
+		end
+		plugin.showDebug = false
+	end
+	callback(arr)
 end
 
 --coutesy of Pande4360
@@ -2536,11 +2603,9 @@ function M.create_component_of_class(class, manualAttachment, relativeTransform,
 		--print("Used AddComponentByClass to create component",component)
 	end
 	if component ~= nil then
-		component:SetVisibility(true)
-		component:SetHiddenInGame(false)
-		if component.SetCollisionEnabled ~= nil then
-			component:SetCollisionEnabled(0, false)
-		end
+		if component.SetVisibility ~= nil then component:SetVisibility(true) end
+		if component.SetHiddenInGame ~= nil then component:SetHiddenInGame(false) end
+		if component.SetCollisionEnabled ~= nil then component:SetCollisionEnabled(0, false) end
 	else
 		M.print("Failed to create_component_of_class because component was nil")
 	end
@@ -2660,6 +2725,46 @@ end
 function M.fname_from_string(str)
 	if str == nil then str = "" end
 	return kismet_string_library:Conv_StringToName(str)
+end
+
+-- print(uevrUtils.ternary(true, true, nil))    -- true
+-- print(uevrUtils.ternary(false, true, nil))   -- nil
+-- print(uevrUtils.ternary(true, false, nil))   -- false
+-- print(uevrUtils.ternary(true, nil, true))    -- nil
+function M.ternary(cond, trueVal, falseVal)
+    if cond then
+        return trueVal
+    else
+        return falseVal
+    end
+end
+
+-- Use this version for expensive computations
+-- For example: ternary(inVal, expensiveA(), expensiveB()) evaluates both always, so use ternary_lazy instead
+-- Example 1:
+-- local result = uevrUtils.ternary_lazy(
+--     boolVal,
+--     function() return nil end,
+--     function() return false end
+-- )
+-- Example 2:
+-- local function add(a, b)
+--     return a + b
+-- end
+-- local function sub(a, b)
+--     return a - b
+-- end
+-- local result = ternary_lazy(
+--     inVal,
+--     function() return add(10, 5) end,
+--     function() return sub(10, 5) end
+-- )
+function M.ternary_lazy(cond, trueFn, falseFn)
+    if cond then
+        return trueFn()
+    else
+        return falseFn()
+    end
 end
 
 -- float values from 0.0 to 1.0
@@ -3058,7 +3163,7 @@ function M.get_decoupled_pitch_adjust_ui()
 end
 
 
-function M.enableCameraLerp(state, pitch, yaw, roll)
+function M.enableCameraLerp(state, pitch, yaw, roll, speed)
 	if pitch == true then
 		uevr.params.vr.set_mod_value("VR_LerpCameraPitch", state and "true" or "false")
 	end
@@ -3067,6 +3172,9 @@ function M.enableCameraLerp(state, pitch, yaw, roll)
 	end
 	if roll == true then
 		uevr.params.vr.set_mod_value("VR_LerpCameraRoll", state and "true" or "false")
+	end
+	if speed ~= nil then
+		uevr.params.vr.set_mod_value("VR_LerpCameraSpeed", speed)
 	end
 end
 
@@ -3086,6 +3194,11 @@ end
 
 function M.setUIFollowsViewSize(size)
 	uevr.params.vr.set_mod_value("UI_Size", tostring(size))
+end
+
+-- 0-flat, 1-cylinder
+function M.setUIShape(overlayType)
+	uevr.params.vr.set_mod_value("UI_OverlayType", tostring(overlayType))
 end
 
 --there should be a better way to do this with the asset registry
@@ -3760,23 +3873,24 @@ function M.getCleanHitResult(hitResult)
 		local bInitialOverlap = {}
 		local Time = {}
 		local Distance = {}
-		local Location = {}
-		local ImpactPoint = {}
-		local Normal = {}
-		local ImpactNormal = {}
+		local Location = {} --M.get_struct_object("ScriptStruct /Script/CoreUObject.Vector", false)
+		local ImpactPoint = {} --M.get_struct_object("ScriptStruct /Script/CoreUObject.Vector", false)
+		local Normal = {} --M.get_struct_object("ScriptStruct /Script/CoreUObject.Vector", false)
+		local ImpactNormal = {} --M.get_struct_object("ScriptStruct /Script/CoreUObject.Vector", false)
 		local PhysMat = {}
 		local HitActor = {}
 		local HitComponent = {}
 		local HitBoneName = {}
+		local BoneName = {}
 		local HitItem = {}
 		local ElementIndex = {}
 		local FaceIndex = {}
-		local TraceStart = {}
-		local TraceEnd = {}
+		local TraceStart = {} --M.get_struct_object("ScriptStruct /Script/CoreUObject.Vector", false)
+		local TraceEnd = {} --M.get_struct_object("ScriptStruct /Script/CoreUObject.Vector", false)
 
 		--static void BreakHitResult(const struct FHitResult& Hit, bool* bBlockingHit, bool* bInitialOverlap, float* Time, float* Distance, struct FVector* Location, struct FVector* ImpactPoint, struct FVector* Normal, struct FVector* ImpactNormal, class UPhysicalMaterial** PhysMat, class AActor** HitActor, class UPrimitiveComponent** HitComponent, class FName* HitBoneName, class FName* BoneName, int32* HitItem, int32* ElementIndex, int32* FaceIndex, struct FVector* TraceStart, struct FVector* TraceEnd);
 		local success = pcall(function()
-			Statics:BreakHitResult(hitResult, bBlockingHit, bInitialOverlap, Time, Distance, Location, ImpactPoint, Normal, ImpactNormal, PhysMat, HitActor, HitComponent, HitBoneName, HitItem, ElementIndex, FaceIndex, TraceStart, TraceEnd )
+			Statics:BreakHitResult(hitResult, bBlockingHit, bInitialOverlap, Time, Distance, Location, ImpactPoint, Normal, ImpactNormal, PhysMat, HitActor, HitComponent, HitBoneName, BoneName, HitItem, ElementIndex, FaceIndex, TraceStart, TraceEnd )
 		end)
 		if not success then
 			--M.print("BreakHitResult failed, falling back to hitResult fields", LogLevel.Warning)
