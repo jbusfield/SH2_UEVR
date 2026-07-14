@@ -9,6 +9,7 @@ Thanks to Praydog, for both UEVR that makes these mods possible and for his orig
 - Visible body
 - Optional Forearms Only or Full Two Bone IK arms
 - Articulated and animated hands
+- Hands can push open doors
 - Option to attach the UI to head movement
 - Support for physical gunstocks (not virtual gunstocks)
 - Fully retains Praydog's melee combat
