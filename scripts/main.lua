@@ -68,7 +68,7 @@ local TraversalType = {
 }
 
 
-local versionTxt = "v1.0.1"
+local versionTxt = "v1.0.2"
 local title = "Silent Hill 2 First Person Mod " .. versionTxt
 local configDefinition = {
 	{
